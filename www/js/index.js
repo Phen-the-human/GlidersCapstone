@@ -4,11 +4,35 @@ var measures = [];
 var measuresPerLine = [];
 var media = null;
 var path = null;
+var timing = null;
+var currentPos = 0;
 
 function onDeviceReady()
 {
 	path = getPhoneGapPath();
 	media = new Media(path + 'Songs/Test-Song/Test.mp3', null, mediaError);
+	$.get(path + 'Songs/Test-Song/Test.txt', function(data, status){
+		timing = data.split('\n');
+	});
+	var buttons = ['Test-Song', 'Stardust'];
+		for(var i = 0; i < buttons.length; i++){
+		$('<button>')
+			.attr({
+			'id' : buttons[i],
+			'class' : 'songName'
+			})
+			.text(buttons[i])
+			.appendTo('#songButtons')
+			.hide();
+		$('<br>').appendTo('#msongButtons');
+		$('<br>').appendTo('#songButtons');
+	}
+
+	$('<button>')
+		.attr('id', 'songMenuBack')
+		.text("Back")
+		.appendTo("#songButtons")
+		.hide();
 	drawNotes();
 }
 
@@ -22,7 +46,9 @@ $(window).resize(function()
 
 $('#song').click(function()
 {
-	alert('under construction');
+	$("#song").toggle();
+	$("#instrument").toggle();
+	$("#songButtons").toggle();
 });
 
 $('#instrument').click(function()
@@ -49,11 +75,15 @@ $(document).ready()
 	var currentLine = 0;
 	var measureLength = 5000;
 	
+	
 	mouseToPhone();
 	
 	display.draggable(
 	{
 		axis: 'y',
+		drag: function(event, ui){
+			selector.css({'top': display.offset().top + 35});
+		},
 		stop: function(event, ui)
 		{
 			if(display.position().top > 8)
@@ -66,6 +96,7 @@ $(document).ready()
 			}*/
 		}
 	});
+
 }
 
 function countMeasures()
@@ -194,7 +225,7 @@ $('body').swipe(
 	{
 		if(menu.hasClass('open'))
 		{
-			menu.animate({left: '-=250px'}, 500);
+			menu.animate({left: '-=230px'}, 500);
 			menu.removeClass('open');
 		}
 	},
@@ -202,7 +233,7 @@ $('body').swipe(
 	{
 		if(!menu.hasClass('open'))
 		{
-			menu.animate({left: '+=250px'}, 500);
+			menu.animate({left: '+=230px'}, 500);
 			menu.addClass('open');
 		}
 	},
@@ -273,49 +304,62 @@ playButton.click(function()
             },
             100
         );
-		highlightTimer = setInterval(
-			function()
-			{
+		
+		var timingCount = null;
+		var isStarted = false;
+		media.getCurrentPosition(function(position){if(position <= 0)isStarted = true},function(e){console.log(e)});
+		if(!isStarted){
+			timingCount = timing[1];
+		}else{
+			timingCount = timing[currentMeasure+1] - currentPos;
+		}
+		var highlighter = function(){
+			clearInterval(interval);
+				timingCount = timing[currentMeasure+1] - timing[currentMeasure];
 				if(measuresThisLine < measuresPerLine[currentLine] - 1)
-				{
-					measuresThisLine++;
-					selector.css({'left': selector.offset().left + selector.width()});
-				} else
-				{
-					measuresThisLine = 0;
-					currentLine++;
-					selector.css({'left': display.offset().left + 9});
-					display.css({'top': display.position().top - ($('#mainWindow_canvas1').height()) - 5});
-				}
-				currentMeasure++;
-				selector.css({'width': measures[currentMeasure]});
-			},
-			measureLength
-		);
+					{
+						measuresThisLine++;
+						selector.css({'left': selector.offset().left + selector.width()});
+					} else
+					{
+						measuresThisLine = 0;
+						currentLine++;
+						selector.css({'left': display.offset().left + 9});
+						display.css({'top': display.position().top - ($('#mainWindow_canvas1').height()) - 5});
+					}
+					currentMeasure++;
+					//measureLength = timing[currentMeasure] - timing[currentMeasure - 1];
+					selector.css({'width': measures[currentMeasure]});
+				interval = setInterval(highlighter, timingCount);
+			}
+		interval = setInterval(highlighter, timingCount);
 		playButton.text('pause');
 	} else
 	{
+		media.getCurrentPosition(function(position){currentPos = position*1000},function(e){console.log(e)});
 		media.pause();
 		playButton.removeClass('playing');
-		clearInterval(highlightTimer);
+		clearInterval(interval);
 		clearInterval(timerDuration);
 		playButton.text('play');
 	}
 });
 
 stopButton.click(function()
-{
+{	
 	display.css({'top': '8px'});
 	selector.css({'top': display.offset().top + 35, 'left': display.offset().left + 9, 'width': measures[0], 'height': $('#mainWindow_canvas1').height() * .9});
 	measuresThisLine = 0;
 	currentLine = 0;
 	currentMeasure = 0;
 	playButton.removeClass('playing');
-	clearInterval(highlightTimer);
+	clearInterval(interval);
 	clearInterval(timerDuration);
+	pos.text('00:00');
 	playButton.text('play');
 	media.stop();
 	media.release();
+	updateSliderPosition(0);
 });
 
 function mediaError(error)
